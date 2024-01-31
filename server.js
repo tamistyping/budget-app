@@ -31,7 +31,7 @@ const expenseSchema = new mongoose.Schema({
   },
 });
 
-const Budget = mongoose.model("budget", budgetSchema);
+const Budget = mongoose.model("Budget", budgetSchema);
 const Expense = mongoose.model("Expense", expenseSchema);
 
 app.get("/", (req, res) => {
@@ -49,8 +49,17 @@ app.get("/budgets", async (req, res) => {
   }
 });
 
+app.get("/expenses", async (req, res) => {
+  try {
+    const allExpenses = await Expense.find({}).populate('budgetId');
+    res.json(allExpenses);
+  } catch (e) {
+    console.error(e);
+  }
+});
+
 app.post("/budgets/new", (req, res) => {
-  const budget = req.budget;
+  const budget = req.body;
   const newBudget = new Budget({ name: budget.name, max: budget.max });
   newBudget
     .save()
@@ -60,3 +69,47 @@ app.post("/budgets/new", (req, res) => {
     })
     .catch((e) => console.error(e));
 });
+
+app.post("/expenses/new", async (req, res) => {
+  const expense = req.body
+  if (expense.budgetId !== 'Uncategorised') {
+    const newExpense = new Expense({
+      description: expense.description,
+      amount: expense.amount,
+      budgetId: expense.budgetId
+    })
+    await newExpense.save()
+    console.log("Expense Saved");
+    res.sendStatus(200)
+  } else {
+    const uncategorised = await Budget.findOne({name: 'Uncategorised'})
+    if(!uncategorised) {
+      const createUncategorised = new Budget({name: 'Uncategorised', max: 0})
+      await createUncategorised.save()
+      const newExpense = new Expense({
+        description: expense.description,
+        expense: expense.amount,
+        budgetId: createUncategorised._id
+      })
+      await newExpense.save()
+      console.log("Expense Saved");
+      res.sendStatus(200)
+    } else {
+      const newExpense = new Expense({
+        description: expense.description,
+        expense: expense.amount,
+        budgetId: uncategorised._id
+      })
+      await newExpense.save()
+      console.log("Expense Saved");
+      res.sendStatus(200)
+    }
+  }
+})
+
+app.delete('/expenses/:id', async (req, res) => {
+  const expenseId = req.params.id
+  await express.findByIdAndDelete(expenseId)
+  console.log("Expense Deleted");
+  res.sendStatus(200)
+})
